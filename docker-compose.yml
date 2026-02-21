@@ -1,0 +1,51 @@
+services:
+  database:
+    restart: unless-stopped
+    image: "postgres:17.5-alpine3.22"
+    env_file:
+      - "./database/.env"
+    shm_size: "128mb"
+    volumes:
+      - pgdb:/var/lib/postgresql/data
+    tmpfs:
+      - /dev/shm:size=134217728
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      interval: 10s
+      retries: 5
+    networks:
+      - main_network
+
+  cloudbeaver:
+    image: "dbeaver/cloudbeaver:25.2.2"
+    container_name: cloudbeaver_web
+    restart: unless-stopped
+    ports:
+      - "8888:8978"
+    volumes:
+      - cloudbeaver_data:/opt/cloudbeaver/workspace
+      - ./cloudbeaver/drivers/oracle:/opt/cloudbeaver/drivers/oracle:ro
+    networks:
+      - main_network
+
+  app:
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    env_file:
+      - ".env"
+    ports:
+      - "8000:8000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - main_network
+
+volumes:
+  pgdb:
+  cloudbeaver_data:
+
+networks:
+  main_network:
